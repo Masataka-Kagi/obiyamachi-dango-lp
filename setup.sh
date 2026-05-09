@@ -110,10 +110,19 @@ else
 fi
 
 # ---------- 7. Firebase auth + project ----------
-echo "[7/8] Checking Firebase auth"
-if ! firebase login:list 2>/dev/null | grep -q "@"; then
-  echo " -> Not logged in. Running firebase login"
-  firebase login
+# Verify the credentials actually work (not just that an email is listed).
+# This catches expired refresh tokens that login:list does not detect.
+echo "[7/8] Verifying Firebase auth (real API call, not just login:list)"
+if ! firebase projects:list --json >/dev/null 2>&1; then
+  echo " -> Token invalid or expired. Running firebase login --reauth"
+  # --reauth re-uses the existing default account; if you want to switch
+  # accounts, run: firebase logout && firebase login   before this script.
+  firebase login --reauth || firebase login
+fi
+
+ACTIVE_ACCOUNT="$(firebase login:list 2>/dev/null | awk '/User:/ {print $2}' | head -1 || true)"
+if [ -n "$ACTIVE_ACCOUNT" ]; then
+  echo " -> Active Firebase account: $ACTIVE_ACCOUNT"
 fi
 
 echo " -> Ensuring Firebase project exists: $PROJECT_ID"
